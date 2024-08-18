@@ -1,4 +1,4 @@
-import { asPixels as asP, asWorldUnits as asW, Camera2D } from './Camera2d';
+import { asPixels as asP, asWorldUnits as asW, Camera2D } from './camera-2d';
 
 test('rotation', () => {
   const c = new Camera2D(asW(50), asW(50));

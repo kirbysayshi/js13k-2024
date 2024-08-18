@@ -1,6 +1,6 @@
-import { DPRCanvas, makeDPRCanvas } from '../../canvas';
-import { usePrimaryCanvas } from '../../dom';
-import { asWorldUnits, Camera2D, Pixels, WorldUnits, wv2 } from './Camera2d';
+import { asWorldUnits, Camera2D, Pixels, WorldUnits, wv2 } from './camera-2d';
+import { makeDPRCanvas } from './canvas';
+import { usePrimaryCanvas } from './dom';
 
 export class CanvasCameraMan {
   camera = new Camera2D(asWorldUnits(100), asWorldUnits(100));

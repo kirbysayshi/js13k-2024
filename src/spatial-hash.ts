@@ -1,13 +1,8 @@
 import { Vector2 } from 'pocket-physics';
-import { ViewportUnits } from './components/ViewportCmp';
 
 type HashId = string & { __isHashId: true };
 
-function hashIdFromUnits(
-  x: ViewportUnits,
-  y: ViewportUnits,
-  cellSize: ViewportUnits
-): HashId {
+function hashIdFromUnits(x: number, y: number, cellSize: number): HashId {
   return `${Math.floor(x / cellSize)}-${Math.floor(y / cellSize)}` as HashId;
 }
 
@@ -47,7 +42,7 @@ interface SpatialHandleInt<T> {
  * Easily convert between types.
  */
 function assertSpatialHandleIsInternal<T>(
-  h: SpatialHandleExt<T> | SpatialHandleInt<T>
+  h: SpatialHandleExt<T> | SpatialHandleInt<T>,
 ): asserts h is SpatialHandleInt<T> {
   if (!h.item) throw new Error('Not a SpatialHandle!');
 }
@@ -55,7 +50,7 @@ function assertSpatialHandleIsInternal<T>(
 function SpatialHandleReset<T>(
   h: SpatialHandleExt<T> | SpatialHandleInt<T>,
   bottomLeft: HashId,
-  upperRight: HashId
+  upperRight: HashId,
 ) {
   assertSpatialHandleIsInternal(h);
   h.bottomLeft = bottomLeft;
@@ -69,7 +64,7 @@ function SpatialHandleCreate<T>(
   item: T,
   bottomLeft: HashId,
   upperRight: HashId,
-  cells: HashId[] = []
+  cells: HashId[] = [],
 ): SpatialHandleInt<T> {
   return {
     item,
@@ -121,7 +116,7 @@ export class SpatialHash<T, U extends Vector2> {
     pos: U,
     wh: U,
     item: T,
-    reuseHandle?: SpatialHandleExt<T>
+    reuseHandle?: SpatialHandleExt<T>,
   ): SpatialHandleExt<T> {
     const { xstart, xend, ystart, yend } = cellBounds(pos, wh, this.cellSize);
     const bottomLeft = hashIdFromCellIndices(xstart, ystart);
@@ -140,7 +135,7 @@ export class SpatialHash<T, U extends Vector2> {
           const found = bucket.has(handle);
           if (found) {
             throw new Error(
-              `Found pre-existing SpatialHandle during add operation. Must delete first.`
+              `Found pre-existing SpatialHandle during add operation. Must delete first.`,
             );
           }
         }
@@ -189,7 +184,7 @@ export class SpatialHash<T, U extends Vector2> {
   query(
     pos: U,
     wh: U,
-    results: SpatialHandleExt<T>[] = []
+    results: SpatialHandleExt<T>[] = [],
   ): SpatialHandleExt<T>[] {
     const { xstart, xend, ystart, yend } = cellBounds(pos, wh, this.cellSize);
 

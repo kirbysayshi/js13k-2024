@@ -1,10 +1,4 @@
 import { v2, Vector2 } from 'pocket-physics';
-import {
-  predictTextHeight,
-  toPixelUnits,
-  ViewportCmp,
-  vv2,
-} from './components/ViewportCmp';
 import { listen, qsel } from './dom';
 import { BlackRGBA, BodyTextFont, BodyTextLines, YellowRGBA } from './theme';
 
@@ -24,19 +18,6 @@ type CssCtrlPanelTop = typeof cssCtrlPanelTop;
 type CssCtrlPanelDisplay = typeof cssCtrlPanelDisplay;
 type CssThanksDisplay = typeof cssThanksDisplay;
 
-export function syncCss(vp: ViewportCmp) {
-  const cameraHalfHeight = vp.camera.frustrum.y;
-  const cameraHalfHeightCssPixels = toPixelUnits(vp, cameraHalfHeight);
-  const cameraHeightCssPixels = cameraHalfHeightCssPixels * 2;
-  const { fontSize } = predictTextHeight(vp, 'M', BodyTextLines, BodyTextFont);
-
-  setRootVar(cssYellowRGBA, YellowRGBA);
-  setRootVar(cssBlackRGBA, BlackRGBA);
-  setRootVar(cssBodyFontSize, fontSize);
-  setRootVar(cssCtrlPanelHeight, `${cameraHalfHeightCssPixels}px`);
-  setRootVar(cssCtrlPanelTop, `${cameraHeightCssPixels}px`);
-}
-
 function setRootVar(
   v: // Variables
   | CssYellowRGBA
@@ -48,7 +29,7 @@ function setRootVar(
     // States
     | CssCtrlPanelDisplay
     | CssThanksDisplay,
-  value: string
+  value: string,
 ) {
   const root = qsel<HTMLHtmlElement>(':root')!;
   root.style.setProperty(v, value);
@@ -62,7 +43,7 @@ const internalState = {
 const uiState = {
   // boosting: false,
   move: v2(),
-  rotate: vv2(),
+  rotate: v2(),
 };
 
 export function getUIState() {
@@ -135,7 +116,7 @@ export function showUIControls() {
 function wireStick(
   stick: HTMLDivElement,
   nub: HTMLDivElement,
-  out_Move: Vector2
+  out_Move: Vector2,
 ) {
   const stickCenter = v2();
   const stickSize = v2();

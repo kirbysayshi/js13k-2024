@@ -2,10 +2,10 @@ const demos: Record<
   string,
   () => Promise<{ boot: () => Promise<void>; shutdown: () => Promise<void> }>
 > = {
-  '#three-body': () => import('./three-body/index.demo.three-body'),
-  '#screen-shake': () => import('./screen-shake/index.demo.screen-shake'),
-  '#entities': () => import('./entities/index.demo.entities'),
-  '#camera2d': () => import('./camera2d/index.demo.camera2d'),
+  // '#three-body': () => import('./three-body/index.demo.three-body'),
+  // '#screen-shake': () => import('./screen-shake/index.demo.screen-shake'),
+  // '#entities': () => import('./entities/index.demo.entities'),
+  // '#camera2d': () => import('./camera2d/index.demo.camera2d'),
 };
 
 window.addEventListener('hashchange', async (ev) => {

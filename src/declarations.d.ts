@@ -1,6 +1,12 @@
 declare module '*.png';
 declare module '*.svg';
 
+declare var process: {
+  env: {
+    NODE_ENV: 'development' | 'production';
+  };
+};
+
 declare module 'science-halt' {
   function scienceHalt(
     onhalt: () => void,
