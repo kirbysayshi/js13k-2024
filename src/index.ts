@@ -30,115 +30,12 @@ import { range } from './range';
 import { useRootElement } from './dom';
 import { isKeyDown } from './keys';
 import { createGameLoop } from './loop';
+import { Entity, EntityManager, Destroyable } from './entity-manager';
 
 const SFX = {
   // prettier-ignore
   hit: () => zzfx(...[2.2,,322,.02,.1,,,3,7,-18,,,.06,1.8,34,.4,.14,.88,.01,.06]), // Hit 13
 };
-
-type EntityId = { id: number; owned: boolean; destroyed: boolean };
-
-class EntityIdMan {
-  private lastId = 0;
-  private entityIds: EntityId[] = [];
-
-  createEntityId() {
-    const id = ++this.lastId;
-    const e = { id, owned: true, destroyed: false };
-    this.entityIds.push(e);
-    return e;
-  }
-
-  destroyEntityId(eid: EntityId) {
-    eid.destroyed = true;
-    const idx = this.entityIds.findIndex((e) => e.id === eid.id);
-    if (idx === -1) return;
-    // TODO: consider the swap trick, depending on whether there is display list
-    // sorting
-    this.entityIds.splice(idx, 1);
-  }
-
-  destroy() {
-    for (const e of this.entityIds) {
-      this.destroyEntityId(e);
-    }
-  }
-}
-
-interface Updatable {
-  update?(dt: number): void;
-}
-
-interface Destroyable {
-  destroy?(): void;
-}
-
-interface Drawable {
-  draw?(interp: number, vp: CanvasCameraMan): void;
-}
-
-interface Initable {
-  init?(): void;
-}
-
-interface Entity {
-  update?(dt: number): void;
-  draw?(interp: number, vp: CanvasCameraMan): void;
-}
-
-abstract class Entity implements Updatable, Destroyable, Drawable, Initable {
-  id;
-
-  constructor(private eman: EntityMan) {
-    this.id = eman.eidman.createEntityId();
-    eman.register(this);
-    this.init();
-  }
-
-  destroy() {
-    this.eman.eidman.destroyEntityId(this.id);
-    this.eman.unregister(this);
-  }
-
-  init(): this {
-    return this;
-  }
-}
-
-class EntityMan<T extends Entity = Entity> {
-  private entities: T[] = [];
-
-  eidman = new EntityIdMan();
-
-  register(entity: T) {
-    this.entities.push(entity);
-  }
-
-  unregister(entity: T) {
-    const idx = this.entities.indexOf(entity);
-    if (idx === -1) return;
-    this.entities.splice(idx, 1);
-  }
-
-  update(dt: number) {
-    for (const e of this.entities) {
-      e.update?.(dt);
-    }
-  }
-
-  draw(interp: number, vp: CanvasCameraMan) {
-    for (const e of this.entities) {
-      e.draw?.(interp, vp);
-    }
-  }
-
-  destroy() {
-    for (const e of this.entities) {
-      e.destroy?.();
-    }
-    this.eidman.destroy();
-  }
-}
 
 function makeIntegratable(initial = wv2()) {
   return {
@@ -312,7 +209,7 @@ class ParticleEntity extends Entity {
 }
 
 class ParticleBurst extends Entity {
-  constructor(eman: EntityMan, pos: WorldUnitVector2, count: number) {
+  constructor(eman: EntityManager, pos: WorldUnitVector2, count: number) {
     super(eman);
     for (let i = 0; i < count; i++) {
       const p = new ParticleEntity(eman);
@@ -335,7 +232,7 @@ class Ship extends Entity {
   rotation = 0;
 
   constructor(
-    eman: EntityMan,
+    eman: EntityManager,
     private camera: Camera2D,
   ) {
     super(eman);
@@ -352,6 +249,61 @@ class Ship extends Entity {
 
   draw(interp: number, vp: CanvasCameraMan) {
     debugDrawIntegratable(vp.ctx, this.movement, interp, this.radius);
+
+    vp.ctx.save();
+
+    // translate to ship's position, but use the cpos instead of the ppos. This
+    // is inaccurate, but gives the impression of the ship "easing" into a new
+    // position... we'll see if this stays or not
+    vp.ctx.translate(
+      this.movement.cpos.x +
+        (this.movement.cpos.x - this.movement.ppos.x) * interp,
+      this.movement.cpos.y +
+        (this.movement.cpos.y - this.movement.ppos.y) * interp,
+    );
+
+    const shipToWorldRatio = 2 / 16;
+
+    vp.ctx.scale(shipToWorldRatio, shipToWorldRatio);
+    vp.ctx.rotate(this.rotation);
+
+    // the nose
+    vp.ctx.beginPath();
+    vp.ctx.moveTo(-1, -8);
+    vp.ctx.lineTo(1, -8);
+    vp.ctx.lineTo(2, 0);
+    vp.ctx.lineTo(2, 2);
+    vp.ctx.lineTo(-2, 2);
+    vp.ctx.lineTo(-2, 0);
+    vp.ctx.lineTo(-1, -8);
+    vp.ctx.fill();
+
+    // the wings
+    vp.ctx.beginPath();
+    vp.ctx.moveTo(0, -2);
+    vp.ctx.lineTo(6, 1);
+    vp.ctx.lineTo(6, 3);
+    vp.ctx.lineTo(3, 2);
+    vp.ctx.lineTo(-3, 2);
+    vp.ctx.lineTo(-6, 3);
+    vp.ctx.lineTo(-6, 1);
+    vp.ctx.lineTo(0, -2);
+    vp.ctx.fill();
+
+    // the engines
+    vp.ctx.beginPath();
+    vp.ctx.moveTo(3, 2);
+    vp.ctx.lineTo(3, 5);
+    vp.ctx.lineTo(1, 5);
+    vp.ctx.lineTo(1, 6);
+    vp.ctx.lineTo(-1, 6);
+    vp.ctx.lineTo(-1, 5);
+    vp.ctx.lineTo(-3, 5);
+    vp.ctx.lineTo(-3, 2);
+    vp.ctx.lineTo(3, 2);
+    vp.ctx.fill();
+
+    vp.ctx.restore();
 
     // draw a nub to represent the rotation direction of the ship
 
@@ -406,7 +358,7 @@ class HoveringCircle extends Entity {
 
   mode: 'acel' | 'tween' = 'acel';
 
-  constructor(eman: EntityMan, initial = wv2(5, -10)) {
+  constructor(eman: EntityManager, initial = wv2(5, -10)) {
     super(eman);
     this.tween = new BoomerangVector2Tween(
       eman,
@@ -469,7 +421,7 @@ class Vector2Tween extends Entity {
   ended = new Sig<void>();
 
   constructor(
-    eman: EntityMan,
+    eman: EntityManager,
     public durationMs: number,
     public startValue = v2(),
     public endValue = v2(),
@@ -537,7 +489,7 @@ class SceneTransition extends Entity {
   wh = wv2(100, 100);
 
   constructor(
-    eman: EntityMan,
+    eman: EntityManager,
     private vp: CanvasCameraMan,
     private onComplete: () => void,
   ) {
@@ -624,7 +576,7 @@ class LevelMan {
 }
 
 class Level0 extends Entity {
-  constructor(eman: EntityMan, context: GameContext) {
+  constructor(eman: EntityManager, context: GameContext) {
     super(eman);
 
     const t1 = new TextEntity(eman);
@@ -650,7 +602,7 @@ class Level1 extends Entity {
   eventsOff = new AbortController();
   ship;
 
-  constructor(eman: EntityMan, context: GameContext) {
+  constructor(eman: EntityManager, context: GameContext) {
     super(eman);
     const c1 = new Circle(eman);
     const t1 = new TextEntity(eman);
@@ -708,7 +660,7 @@ class Level1 extends Entity {
 }
 
 interface GameContext {
-  eman: EntityMan;
+  eman: EntityManager;
   vp: CanvasCameraMan;
   shaker: ScreenShake;
   levelMan: LevelMan;
@@ -720,7 +672,7 @@ class App implements Destroyable {
   eventsOff = new AbortController();
 
   constructor() {
-    const eman = new EntityMan();
+    const eman = new EntityManager();
     this.context = {
       eman,
       vp: new CanvasCameraMan(useRootElement),
