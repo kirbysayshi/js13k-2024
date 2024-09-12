@@ -9,7 +9,6 @@
       ondragleave=${function(t){console.log("drag leave"),t.currentTarget.style.backgroundColor="transparent"}}
     >
       <div style="pointer-events:none;">
-        <div>Friend A</div>
         <div style="position:relative; height: 2rem;">
           <meter
             ref=${u}
