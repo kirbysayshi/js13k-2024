@@ -1,741 +1,530 @@
-import ScienceHalt from 'science-halt';
-import {
-  Integratable,
-  Vector2,
-  VelocityDerivable,
-  accelerate,
-  add,
-  copy,
-  distance,
-  inertia,
-  rotate2d,
-  set,
-  solveDrag,
-  translate,
-  v2,
-} from 'pocket-physics';
+import { stract } from './stract';
+import { assertDefinedFatal } from './utils';
 
-import { zzfx } from 'zzfx';
-import { CanvasCameraMan } from './camera-canvas-man';
-import {
-  wv2,
-  asWorldUnits,
-  WorldUnits,
-  WorldUnitVector2,
-  drawWorldText,
-  asPixels,
-  Camera2D,
-} from './camera-2d';
-import { range } from './range';
-import { useRootElement } from './dom';
-import { isKeyDown } from './keys';
-import { createGameLoop } from './loop';
-import { Entity, EntityManager, Destroyable } from './entity-manager';
+const ticks1Hz = new Set<() => void>();
+function register1HzTick(onTick: () => void) {
+  ticks1Hz.add(onTick);
+  return () => ticks1Hz.delete(onTick);
+}
 
-const SFX = {
-  // prettier-ignore
-  hit: () => zzfx(...[2.2,,322,.02,.1,,,3,7,-18,,,.06,1.8,34,.4,.14,.88,.01,.06]), // Hit 13
+const ticks10Hz = new Set<() => void>();
+function register10HzTick(onTick: () => void) {
+  ticks10Hz.add(onTick);
+  return () => ticks10Hz.delete(onTick);
+}
+
+const ticks100Hz = new Set<() => void>();
+function register100HzTick(onTick: () => void) {
+  ticks100Hz.add(onTick);
+  return () => ticks10Hz.delete(onTick);
+}
+
+function run1HzTicks() {
+  for (const tick of ticks1Hz) {
+    tick();
+  }
+}
+
+function run10HzTicks() {
+  for (const tick of ticks10Hz) {
+    tick();
+  }
+}
+
+function run100HzTicks() {
+  for (const tick of ticks100Hz) {
+    tick();
+  }
+}
+
+class BrowserTimeoutCtrl {
+  private next: ReturnType<typeof setTimeout> | null = null;
+
+  set(...args: Parameters<typeof setTimeout>): void {
+    this.clear();
+    this.next = setTimeout(...args);
+  }
+
+  clear(): void {
+    if (this.next) clearTimeout(this.next);
+  }
+}
+
+class BrowserIntervalCtrl {
+  constructor() {}
+  private next: ReturnType<typeof setInterval> | null = null;
+
+  set(...args: Parameters<typeof setInterval>): void {
+    this.clear();
+    this.next = setInterval(...args);
+  }
+
+  clear(): void {
+    if (this.next) clearInterval(this.next);
+  }
+}
+
+type Ref<T> = { current: T | null };
+
+function autoRef<T>() {
+  const ref: Ref<T> = { current: null };
+  return [ref, (el: T) => (ref.current = el)] as const;
+}
+
+function Friend(
+  id: string,
+  markFriendAsInactive: (id: string) => void,
+  startingShame: number,
+) {
+  const [$, set$] = autoRef<HTMLDivElement>();
+  const [progressRef, setProgressRef] = autoRef<HTMLMeterElement>();
+  const [progressLabel, setProgressLabel] = autoRef<HTMLProgressElement>();
+
+  register1HzTick(() => {
+    if (progressRef.current && progressLabel.current) {
+      progressRef.current.value += Math.random() > 0.75 ? 5 : 1;
+
+      updateLabel();
+
+      if (progressRef.current.value >= 100) {
+        markUnrecoverable();
+      }
+    }
+  });
+
+  function updateLabel() {
+    if (!progressRef.current || !progressLabel.current) return;
+
+    if (progressRef.current.value >= 100) {
+      progressLabel.current.style.backgroundColor = 'red';
+      progressLabel.current.textContent = 'Shame Unrecoverable';
+    } else if (progressRef.current.value > 90) {
+      progressLabel.current.style.backgroundColor = 'red';
+      progressLabel.current.textContent = 'Shame Critical!!!';
+    } else if (progressRef.current.value <= 90) {
+      progressLabel.current.style.backgroundColor = 'black';
+      progressLabel.current.textContent = 'Shame OK';
+    }
+  }
+
+  const topics: string[] = [];
+  // const topicCount = 2;
+  // for (let i = 0; i < topicCount; i++) {
+  // const rand = Math.random();
+  topics.push(generateTopic(2));
+  topics.push(generateTopic(4));
+  // }
+
+  let recoverable = true;
+  function markUnrecoverable() {
+    recoverable = false;
+    if (!$.current) return;
+    $.current.style.opacity = '0.2';
+    markFriendAsInactive(id);
+  }
+
+  function willAccept(ev: DragEvent) {
+    if (!ev.dataTransfer) return false;
+    if (!recoverable) return false;
+    const topic = ev.dataTransfer.getData('text/plain');
+    if (topics.find((t) => t === topic)) return true;
+    return false;
+  }
+
+  function onDragOver(ev: DragEvent) {
+    if (willAccept(ev)) {
+      ev.preventDefault();
+    }
+  }
+
+  function onDrop(ev: DragEvent) {
+    ev.preventDefault();
+    const data = ev.dataTransfer?.getData('text/plain');
+    if (!data) return;
+    console.log(`Dropped ${data}`);
+
+    const gs = getGameState();
+    if (gs.dragTarget) {
+      gs.dragTarget.remove();
+      gs.dragTarget = null;
+    }
+
+    // reset styles
+    const target = ev.currentTarget as HTMLElement;
+    target.style.backgroundColor = 'transparent';
+
+    if (progressRef.current) progressRef.current.value -= data.length * 10;
+
+    updateLabel();
+  }
+
+  function onDragEnter(ev: DragEvent) {
+    if (!willAccept(ev)) return;
+
+    console.log('drag enter');
+    const target = ev.currentTarget as HTMLElement;
+    target.style.backgroundColor = 'blue';
+  }
+
+  function onDragLeave(ev: DragEvent) {
+    console.log('drag leave');
+    const target = ev.currentTarget as HTMLElement;
+    target.style.backgroundColor = 'transparent';
+  }
+
+  // NOTE: pointer-events: none is so that only the dropzone receives
+  // onDragLeave. Otherwise the child elements will trigger it and cause the
+  // styling to be reset.
+
+  return stract`
+    <div
+      data-friendid=${id}
+      ref=${set$}
+      class="border-1"
+      ondrop=${onDrop}
+      ondragover=${onDragOver}
+      ondragenter=${onDragEnter}
+      ondragleave=${onDragLeave}
+    >
+      <div style="pointer-events:none;">
+        <div>Friend A</div>
+        <div style="position:relative; height: 2rem;">
+          <meter
+            ref=${setProgressRef}
+            value=${startingShame}
+            min=0
+            optimium=0
+            low="10"
+            high=90
+            max=100
+            style="
+              width: 100%;
+              height: 1rem;
+            "
+          ></meter>
+          <label
+            ref=${setProgressLabel}
+            style="
+              position:absolute;
+              right: 0;
+              bottom: 0;
+              background-color: black;
+              text-transform: uppercase;
+            "
+          >Shame</label>
+        </div>
+        <ul>
+          ${topics.map((topic) => stract`<li>${topic}</li>`)}
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
+function SharablesList() {
+  register1HzTick(() => {
+    const rand = Math.random();
+    if (rand > 0.5) {
+      // spawn new sharable
+      list.current?.appendChild(Sharable());
+    }
+  });
+
+  const list: Ref<HTMLUListElement> = { current: null };
+
+  return stract`
+    <div>
+      <ul ref=${(el: HTMLUListElement) => (list.current = el)}>
+      </ul>
+    </div>
+  `;
+}
+
+const icons = [
+  // large circle
+  '\u25EF',
+  // triangle,
+  '\u25B3',
+  // square
+  '\u25FB',
+  // cross
+  '\u2715',
+];
+
+function generateTopic(length: number) {
+  let topic = '';
+  for (let i = 0; i < length; i++) {
+    const rand = Math.random();
+    const icon = icons[Math.floor(rand * icons.length)];
+    topic = `${topic}${icon}`.split('').sort().join('');
+  }
+  return topic;
+}
+
+function Sharable() {
+  // const rand = Math.random();
+  const topic = generateTopic(Math.random() > 0.85 ? 4 : 2);
+
+  function onDragStart(ev: DragEvent) {
+    if (!ev.dataTransfer) return;
+    ev.dataTransfer.dropEffect = 'move';
+    ev.dataTransfer.setData('text/plain', topic);
+    const target = ev.target as HTMLElement;
+    getGameState().dragTarget = target;
+  }
+
+  // Do styling here, as this event seems to fire after the clone has been made.
+  function onDrag(ev: DragEvent) {
+    const target = ev.target as HTMLElement;
+    target.style.outline = '1px solid red';
+  }
+
+  function onDragEnd(ev: DragEvent) {
+    const target = ev.target as HTMLElement;
+    target.style.outline = '';
+  }
+
+  let age = 0;
+  const maxAge = 10;
+  const unregHz = register1HzTick(() => {
+    if (!$.current) return;
+    age += 1;
+
+    // TODO: lerp
+    $.current.style.opacity = `${1 - age / maxAge}`;
+
+    if (age > maxAge) {
+      $.current.remove();
+      unregHz();
+    }
+  });
+
+  const [$, set$] = autoRef<HTMLDataListElement>();
+
+  return stract`
+    <li
+      ref=${set$}
+      draggable="true"
+      ondragstart=${onDragStart}
+      ondrag=${onDrag}
+      ondragend=${onDragEnd}
+    >
+      <button>✥</button>
+      ${topic}
+    </li>
+  `;
+}
+
+function fmtMsAsHHSSMM(ms: number) {
+  const totalSeconds = ms / 1000;
+  // const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const milliseconds = ms % 1000;
+  return `${minutes > 9 ? minutes : `0${minutes}`}:${seconds > 9 ? seconds : `0${seconds}`}.${milliseconds > 99 ? milliseconds : milliseconds > 9 ? `0${milliseconds}` : `00${milliseconds}`}`;
+}
+
+function AnxietyTicker(
+  getTotalActiveFriendsCount: () => number,
+  markAnxietyNotSustainedRef: Ref<() => { ms: number; points: number }>,
+) {
+  const [$time, set$time] = autoRef<HTMLDivElement>();
+  const [$points, set$points] = autoRef<HTMLDivElement>();
+  const [$label, set$label] = autoRef<HTMLDivElement>();
+
+  let ms = 0;
+  let points = 0;
+  register100HzTick(() => {
+    if (!$time.current || !$points.current || !sustained) return;
+    ms += 10;
+    $time.current.textContent = fmtMsAsHHSSMM(ms);
+
+    points += getTotalActiveFriendsCount();
+    $points.current.textContent = `${points} points`;
+  });
+
+  let sustained = true;
+
+  function markAnxietyNotSustained() {
+    assertDefinedFatal($label.current);
+    sustained = false;
+    $label.current.textContent = 'Anxiety Not Sustained';
+    // $points.current.textContent = '';
+    return { ms, points };
+  }
+
+  markAnxietyNotSustainedRef.current = markAnxietyNotSustained;
+
+  return stract`
+    <div
+      style="
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      "
+    >
+      <div style="position: relative;">
+        <header
+          ref=${set$label}
+          style='
+            position: absolute;
+            left: 0;
+            top: 0;
+            background-color: black;
+            text-transform: uppercase;
+          '
+        >Anxiety Sustaining</header>
+        <div
+          style="
+            font-size: 5rem;
+            font-variant-numeric: tabular-nums;
+            font-family: monospace;
+            font-weight: bold;
+          "
+          ref=${set$time}
+        ></div>
+        <div
+          ref=${set$points}
+        ></div>
+      </div>
+    </div>
+  `;
+}
+
+function AnxietyNotSustained(
+  animationCompleted: () => void,
+  totalMs: number,
+  totalPoints: number,
+) {
+  const [$, set$] = autoRef<HTMLElement>();
+
+  const parts = `Anxiety Not Sustained`.split(' ');
+  const sub = [
+    `Anxiety lasted ${fmtMsAsHHSSMM(totalMs)}, ${totalPoints} points`,
+  ];
+
+  const off = register1HzTick(() => {
+    if (parts.length === 0) {
+      const part = sub.shift();
+      if (!part) return;
+
+      $.current?.appendChild(
+        stract`<span style="font-size: 1rem;"><span style="background-color: black;">${part}</span></span>`,
+      );
+
+      if (sub.length === 0) {
+        off();
+        animationCompleted();
+        return;
+      }
+    }
+    const part = parts.shift();
+    if (!part) return;
+    $.current?.appendChild(
+      // double span so that the first is flex'ed, and the second is sized just
+      // to the text
+      stract`<span><span style="background-color: black;">${part}</span></span>`,
+    );
+  });
+
+  return stract`
+    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0">
+      <div
+        ref=${set$}
+        style="
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          font-size: 5rem;
+          text-transform: uppercase;
+        "
+      ></div>
+    </div>
+  `;
+}
+
+function Root() {
+  const ctrl1Hz = new BrowserIntervalCtrl();
+  ctrl1Hz.set(() => {
+    run1HzTicks();
+  }, 1000);
+
+  const ctrl10Hz = new BrowserIntervalCtrl();
+  ctrl10Hz.set(() => {
+    run10HzTicks();
+  }, 100);
+
+  const ctrl100Hz = new BrowserIntervalCtrl();
+  ctrl100Hz.set(() => {
+    run100HzTicks();
+  }, 10);
+
+  function stopTickers() {
+    ctrl1Hz.clear();
+    ctrl10Hz.clear();
+    ctrl100Hz.clear();
+  }
+
+  window.addEventListener('keyup', (ev) => {
+    if (ev.key === 'Escape') {
+      stopTickers();
+      console.log('halt');
+    }
+  });
+
+  const friends = [
+    { id: 'a', startingShame: 50 },
+    { id: 'b', startingShame: 40 },
+    { id: 'c', startingShame: 75 },
+  ];
+
+  function getTotalActiveFriendsCount() {
+    return friends.length;
+  }
+
+  function animationCompleted() {
+    stopTickers();
+  }
+
+  const markAnxietyNotSustainedRef: Ref<() => { ms: number; points: number }> =
+    { current: null };
+
+  function markFriendAsInactive(id: string) {
+    const idx = friends.findIndex((f) => f.id === id);
+    if (idx === -1) return;
+    friends.splice(idx, 1);
+
+    if (friends.length === 0) {
+      // end state
+      const { ms, points } = markAnxietyNotSustainedRef.current?.() ?? {
+        ms: 0,
+        points: 0,
+      };
+      $.current?.appendChild(
+        AnxietyNotSustained(animationCompleted, ms, points),
+      );
+    }
+  }
+
+  const [$, set$] = autoRef<HTMLDivElement>();
+
+  return stract`
+    <div ref=${set$} style="position: relative;">
+      ${AnxietyTicker(getTotalActiveFriendsCount, markAnxietyNotSustainedRef)}
+      ${friends.map((f) => Friend(f.id, markFriendAsInactive, f.startingShame))}
+      ${SharablesList()}
+    </div>
+  `;
+}
+
+const gameState = {
+  dragTarget: null as HTMLElement | null,
 };
 
-function makeIntegratable(initial = wv2()) {
-  return {
-    cpos: copy(wv2(), initial),
-    ppos: copy(wv2(), initial),
-    acel: wv2(),
-  };
+function getGameState() {
+  return gameState;
 }
 
-class Circle extends Entity {
-  movement: Integratable = makeIntegratable();
-  radius = asWorldUnits(10);
+document.querySelector('body')?.appendChild(Root());
 
-  update(dt: number) {
-    accelerate(this.movement, dt);
-    inertia(this.movement);
-  }
-
-  draw(interp: number, vp: CanvasCameraMan) {
-    debugDrawIntegratable(vp.ctx, this.movement, interp, this.radius);
-  }
-}
-
-export function debugDrawIntegratable(
-  ctx: CanvasRenderingContext2D,
-  cmp: VelocityDerivable,
-  interp: number,
-  radius: WorldUnits = asWorldUnits(1),
-  opacity: number = 0.2,
-) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.fillStyle = `rgba(0,0,255,${opacity})`;
-  ctx.arc(
-    cmp.ppos.x + (cmp.cpos.x - cmp.ppos.x) * interp,
-    cmp.ppos.y + (cmp.cpos.y - cmp.ppos.y) * interp,
-    radius,
-    0,
-    Math.PI * 2,
-  );
-  ctx.fill();
-  ctx.restore();
-}
-
-class ScreenShake extends Entity {
-  strength = 0;
-  durationMs = 0;
-  angle = 0;
-
-  offset = v2();
-  rotation = 0;
-
-  shake(stength: number, durationMs: number, angle: number) {
-    this.strength = stength;
-    this.durationMs = durationMs;
-    this.angle = angle;
-
-    setTimeout(() => {
-      this.offset = { x: 0, y: 0 };
-      this.rotation = 0;
-    }, durationMs);
-  }
-
-  update(dt: number) {
-    this.offset.x = range(-this.strength, this.strength);
-    this.offset.y = range(-this.strength, this.strength);
-    this.rotation = range(-this.angle, this.angle);
-    this.durationMs = Math.max(this.durationMs - dt, 0);
-    if (this.durationMs <= 0) {
-      set(this.offset, 0, 0);
-      this.rotation = 0;
-    }
-  }
-
-  specialDraw(interp: number, vp: CanvasCameraMan, stage: 'before' | 'after') {
-    if (stage === 'before') {
-      vp.ctx.translate(this.offset.x, this.offset.y);
-      vp.ctx.rotate(this.rotation);
-    } else {
-      vp.ctx.rotate(-this.rotation);
-      vp.ctx.translate(-this.offset.x, -this.offset.y);
-    }
-  }
-}
-
-class TextEntity extends Entity {
-  text = '';
-  sizeInViewportLines = 30;
-
-  movement = makeIntegratable();
-
-  setText(text: string, pos: WorldUnitVector2, sizeInViewportLines: number) {
-    this.text = text;
-    copy(this.movement.cpos, pos);
-    copy(this.movement.ppos, pos);
-    this.sizeInViewportLines = sizeInViewportLines;
-  }
-
-  update(dt: number) {
-    accelerate(this.movement, dt);
-    inertia(this.movement);
-  }
-
-  draw(interp: number, vp: CanvasCameraMan) {
-    // drawWorldText(
-    //   vp.ctx,
-    //   vp.camera.getRotation(),
-    //   this.text,
-    //   this.movement.cpos.x,
-    //   this.movement.cpos.y,
-    //   20,
-    //   'center',
-    // );
-    drawWorldText(
-      vp.ctx,
-      vp.camera,
-      asPixels(vp.height),
-      this.text,
-      this.movement.cpos.x,
-      this.movement.cpos.y,
-      this.sizeInViewportLines,
-      (ctx, fontSizePx) => {
-        ctx.fillStyle = 'black';
-        ctx.font = `${fontSizePx}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-      },
-    );
-  }
-}
-
-function easeOutCirc(x: number): number {
-  return Math.sqrt(1 - Math.pow(x - 1, 2));
-}
-
-function easeInOutSine(x: number): number {
-  return -(Math.cos(Math.PI * x) - 1) / 2;
-}
-
-class ParticleEntity extends Entity {
-  movement = makeIntegratable();
-  radius = asWorldUnits(1);
-  private initialAge = 0;
-  private age = 0;
-
-  setLifespan(ms: number) {
-    this.initialAge = ms;
-    this.age = ms;
-  }
-
-  update(dt: number) {
-    accelerate(this.movement, dt);
-    inertia(this.movement);
-    solveDrag(this.movement, 0.9);
-
-    this.age -= dt;
-    if (this.age <= 0) {
-      this.destroy();
-    }
-  }
-
-  draw(interp: number, vp: CanvasCameraMan) {
-    debugDrawIntegratable(
-      vp.ctx,
-      this.movement,
-      interp,
-      this.radius,
-      0.2 * easeOutCirc(this.age / this.initialAge),
-    );
-  }
-}
-
-class ParticleBurst extends Entity {
-  constructor(eman: EntityManager, pos: WorldUnitVector2, count: number) {
-    super(eman);
-    for (let i = 0; i < count; i++) {
-      const p = new ParticleEntity(eman);
-      p.setLifespan(range(100, 300));
-      copy(p.movement.cpos, pos);
-      copy(p.movement.ppos, pos);
-      set(p.movement.acel, range(-8, 8), range(-8, 8));
-    }
-  }
-
-  update(dt: number): void {
-    // immediately destroy self since particles have been emitted!
-    this.destroy();
-  }
-}
-
-class Ship extends Entity {
-  movement = makeIntegratable();
-  radius = asWorldUnits(2);
-  rotation = 0;
-
-  constructor(
-    eman: EntityManager,
-    private camera: Camera2D,
-  ) {
-    super(eman);
-    translate(wv2(0, 0), this.movement.cpos, this.movement.ppos);
-  }
-
-  update(dt: number) {
-    accelerate(this.movement, dt);
-    inertia(this.movement);
-    solveDrag(this.movement, 0.9);
-
-    this.camera.setPosition(this.movement.cpos);
-  }
-
-  draw(interp: number, vp: CanvasCameraMan) {
-    debugDrawIntegratable(vp.ctx, this.movement, interp, this.radius);
-
-    vp.ctx.save();
-
-    // translate to ship's position, but use the cpos instead of the ppos. This
-    // is inaccurate, but gives the impression of the ship "easing" into a new
-    // position... we'll see if this stays or not
-    vp.ctx.translate(
-      this.movement.cpos.x +
-        (this.movement.cpos.x - this.movement.ppos.x) * interp,
-      this.movement.cpos.y +
-        (this.movement.cpos.y - this.movement.ppos.y) * interp,
-    );
-
-    const shipToWorldRatio = 2 / 16;
-
-    vp.ctx.scale(shipToWorldRatio, shipToWorldRatio);
-    vp.ctx.rotate(this.rotation);
-
-    // the nose
-    vp.ctx.beginPath();
-    vp.ctx.moveTo(-1, -8);
-    vp.ctx.lineTo(1, -8);
-    vp.ctx.lineTo(2, 0);
-    vp.ctx.lineTo(2, 2);
-    vp.ctx.lineTo(-2, 2);
-    vp.ctx.lineTo(-2, 0);
-    vp.ctx.lineTo(-1, -8);
-    vp.ctx.fill();
-
-    // the wings
-    vp.ctx.beginPath();
-    vp.ctx.moveTo(0, -2);
-    vp.ctx.lineTo(6, 1);
-    vp.ctx.lineTo(6, 3);
-    vp.ctx.lineTo(3, 2);
-    vp.ctx.lineTo(-3, 2);
-    vp.ctx.lineTo(-6, 3);
-    vp.ctx.lineTo(-6, 1);
-    vp.ctx.lineTo(0, -2);
-    vp.ctx.fill();
-
-    // the engines
-    vp.ctx.beginPath();
-    vp.ctx.moveTo(3, 2);
-    vp.ctx.lineTo(3, 5);
-    vp.ctx.lineTo(1, 5);
-    vp.ctx.lineTo(1, 6);
-    vp.ctx.lineTo(-1, 6);
-    vp.ctx.lineTo(-1, 5);
-    vp.ctx.lineTo(-3, 5);
-    vp.ctx.lineTo(-3, 2);
-    vp.ctx.lineTo(3, 2);
-    vp.ctx.fill();
-
-    vp.ctx.restore();
-
-    // draw a nub to represent the rotation direction of the ship
-
-    const nubDist = asWorldUnits(-2);
-    const vd: VelocityDerivable = {
-      cpos: wv2(0, nubDist),
-      ppos: wv2(0, nubDist),
-    };
-
-    // rotate acel according to ship's rotation
-    rotate2d(vd.cpos, vd.cpos, wv2(), this.rotation);
-    rotate2d(vd.ppos, vd.ppos, wv2(), this.rotation);
-
-    // translate to ship's position
-    add(vd.cpos, vd.cpos, this.movement.cpos);
-    add(vd.ppos, vd.ppos, this.movement.ppos);
-
-    debugDrawIntegratable(vp.ctx, vd, interp, asWorldUnits(0.5));
-  }
-
-  translate(dir: 'forward' | 'back' | 'left' | 'right') {
-    const power = 0.5;
-    let acel;
-    if (dir === 'forward') acel = wv2(0, -power);
-    else if (dir === 'back') acel = wv2(0, power);
-    else if (dir === 'left') acel = wv2(-power, 0);
-    else if (dir === 'right') acel = wv2(power, 0);
-    else return;
-
-    // rotate acel according to ship's rotation
-    const rotatedAcel = rotate2d(wv2(), acel, wv2(), this.rotation);
-    add(this.movement.acel, this.movement.acel, rotatedAcel);
-  }
-
-  rotate(dir: 'left' | 'right') {
-    const power = 0.1;
-    let rot;
-    if (dir === 'left') rot = -power;
-    else if (dir === 'right') rot = power;
-    else return;
-    this.rotation += rot;
-    this.camera.rotate(asWorldUnits(rot));
-  }
-}
-
-class HoveringCircle extends Entity {
-  private movement = makeIntegratable();
-  private radius = asWorldUnits(4);
-
-  private accumulator = 0;
-  private tween;
-
-  mode: 'acel' | 'tween' = 'acel';
-
-  constructor(eman: EntityManager, initial = wv2(5, -10)) {
-    super(eman);
-    this.tween = new BoomerangVector2Tween(
-      eman,
-      2000,
-      copy(wv2(), initial),
-      wv2(initial.x, initial.y + 2),
-      easeInOutSine,
-    );
-    this.tween.start();
-    copy(this.movement.cpos, initial);
-    copy(this.movement.ppos, initial);
-  }
-
-  update(dt: number) {
-    if (this.mode === 'acel') {
-      this.accumulator += dt;
-      const hover = 0.01;
-      const acel = wv2(0, hover * Math.sin(this.accumulator / 1000));
-      add(this.movement.acel, this.movement.acel, acel);
-
-      accelerate(this.movement, dt);
-      inertia(this.movement);
-      solveDrag(this.movement, 0.9);
-    } else {
-      this.tween.update(dt);
-      copy(this.movement.cpos, this.tween.current);
-      copy(this.movement.ppos, this.tween.current);
-    }
-  }
-
-  draw(interp: number, vp: CanvasCameraMan) {
-    debugDrawIntegratable(vp.ctx, this.movement, interp, this.radius);
-  }
-}
-
-function easeInExpo(x: number): number {
-  return x === 0 ? 0 : Math.pow(2, 10 * x - 10);
-}
-
-class Sig<T> {
-  private owners = new Map<unknown, (it: T) => void>();
-  on(owner: unknown, cb: (it: T) => void) {
-    this.owners.set(owner, cb);
-  }
-
-  off(owner: unknown) {
-    this.owners.delete(owner);
-  }
-
-  fire(it: T) {
-    for (const [owner, cb] of this.owners) cb(it);
-  }
-}
-
-class Vector2Tween extends Entity {
-  elapsed = 0;
-  current = v2();
-  state: 'not-started' | 'running' | 'finished' = 'not-started';
-  started = new Sig<void>();
-  ended = new Sig<void>();
-
-  constructor(
-    eman: EntityManager,
-    public durationMs: number,
-    public startValue = v2(),
-    public endValue = v2(),
-    public ease = easeInExpo,
-  ) {
-    super(eman);
-
-    copy(this.current, this.startValue);
-  }
-
-  start() {
-    this.state = 'running';
-    this.started.fire();
-  }
-
-  update(dt: number) {
-    if (this.state !== 'running') return;
-    this.elapsed += dt;
-    if (this.elapsed < this.durationMs) {
-      const t = this.ease(this.elapsed / this.durationMs);
-      this.current.x = asWorldUnits(
-        this.startValue.x + (this.endValue.x - this.startValue.x) * t,
-      );
-      this.current.y = asWorldUnits(
-        this.startValue.y + (this.endValue.y - this.startValue.y) * t,
-      );
-    } else {
-      copy(this.current, this.endValue);
-      this.state = 'finished';
-      this.ended.fire();
-    }
-  }
-
-  destroy() {
-    this.started.off(this);
-    this.ended.off(this);
-  }
-}
-
-class BoomerangVector2Tween extends Vector2Tween {
-  update(dt: number) {
-    super.update(dt);
-
-    if (this.state === 'finished') {
-      // swap start and end
-      const temp = this.startValue;
-      this.startValue = this.endValue;
-      this.endValue = temp;
-
-      // reset elapsed time
-      this.elapsed = 0;
-
-      // start again
-      this.start();
-    }
-  }
-}
-
-class SceneTransition extends Entity {
-  private tween0: Vector2Tween;
-  private tween1: Vector2Tween;
-  private tween2: Vector2Tween;
-
-  movement = makeIntegratable();
-  wh = wv2(100, 100);
-
-  constructor(
-    eman: EntityManager,
-    private vp: CanvasCameraMan,
-    private onComplete: () => void,
-  ) {
-    super(eman);
-    this.tween0 = new Vector2Tween(
-      eman,
-      1000,
-      add(wv2(), this.vp.camera.getPosition(), wv2(-100, 0)),
-      copy(wv2(), this.vp.camera.getPosition()),
-      easeInExpo,
-    );
-    // timing only
-    this.tween1 = new Vector2Tween(eman, 1000);
-    // will be used for opacity
-    this.tween2 = new Vector2Tween(eman, 1000, v2(1, 1), v2(0, 0));
-
-    this.tween0.start();
-    this.tween0.ended.on(this, () => {
-      this.tween1.start();
-      this.onComplete();
-    });
-    this.tween1.ended.on(this, () => this.tween2.start());
-    this.tween2.ended.on(this, () => this.destroy());
-  }
-
-  update(dt: number) {
-    // each tick set tween target to camera position, just in case camera moves
-    copy(this.tween0.endValue, this.vp.camera.getPosition());
-
-    // update output
-    copy(this.movement.cpos, this.tween0.current);
-    copy(this.movement.ppos, this.tween0.current);
-  }
-
-  draw(interp: number, vp: CanvasCameraMan) {
-    debugDrawIntegratableRect(
-      vp.ctx,
-      this.movement,
-      interp,
-      this.wh,
-      this.tween2.current.x,
-    );
-  }
-
-  destroy(): void {
-    super.destroy();
-    this.tween0.destroy();
-    this.tween1.destroy();
-  }
-}
-
-export function debugDrawIntegratableRect(
-  ctx: CanvasRenderingContext2D,
-  cmp: VelocityDerivable,
-  interp: number,
-  wh: WorldUnitVector2,
-  opacity = 0.2,
-) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.fillStyle = `rgba(0,0,255,${opacity})`;
-
-  const vpX = cmp.ppos.x + (cmp.cpos.x - cmp.ppos.x) * interp;
-  const vpY = cmp.ppos.y + (cmp.cpos.y - cmp.ppos.y) * interp;
-  const halfW = wh.x / 2;
-  const halfH = wh.y / 2;
-
-  const x = vpX - halfW;
-  const y = vpY - halfH;
-  const w = wh.x;
-  const h = wh.y;
-
-  ctx.fillRect(x, y, w, h);
-  ctx.restore();
-}
-
-class LevelMan {
-  level: Entity | null = null;
-
-  setLevel(level: Entity) {
-    this.level?.destroy();
-    this.level = level;
-  }
-}
-
-class Level0 extends Entity {
-  constructor(eman: EntityManager, context: GameContext) {
-    super(eman);
-
-    const t1 = new TextEntity(eman);
-    t1.setText('Click to Start!', wv2(0, 0), 30);
-
-    const { vp, levelMan } = context;
-
-    vp.canvasElement.addEventListener(
-      'click',
-      () => {
-        new SceneTransition(eman, vp, () => {
-          levelMan.setLevel(new Level1(eman, context));
-        });
-
-        t1.destroy();
-      },
-      { once: true },
-    );
-  }
-}
-
-class Level1 extends Entity {
-  eventsOff = new AbortController();
-  ship;
-
-  constructor(eman: EntityManager, context: GameContext) {
-    super(eman);
-    const c1 = new Circle(eman);
-    const t1 = new TextEntity(eman);
-    t1.setText('Hello', wv2(0, 0), 30);
-    t1.movement.acel.y = asWorldUnits(1);
-
-    this.ship = new Ship(eman, context.vp.camera);
-
-    const h0 = new HoveringCircle(eman);
-    const h1 = new HoveringCircle(eman, wv2(9, 0));
-    h1.mode = 'tween';
-
-    addEventListener(
-      'click',
-      (ev) => {
-        const { vp, shaker } = context;
-
-        // How to pick from screen space to world:
-
-        // canvas/element space
-        const rect = vp.canvasElement.getBoundingClientRect();
-        const cvsLocalX = ev.clientX - rect.left;
-        const cvsLocalY = ev.clientY - rect.top;
-
-        const worldSpace = vp.camera.screenToWorld(
-          asPixels(cvsLocalX),
-          asPixels(cvsLocalY),
-          asPixels(vp.width),
-          asPixels(vp.height),
-        );
-
-        // distance from center of screen (aka camera) to picked point
-        const d = distance(worldSpace, vp.camera.getPosition());
-
-        // shake according to distance
-        shaker.shake(d, 200, 0);
-
-        // burst at mouse position in world
-        const p0 = new ParticleBurst(eman, worldSpace, 10);
-        SFX.hit();
-      },
-      { signal: this.eventsOff.signal },
-    );
-  }
-
-  update(dt: number) {
-    // keyboard controls
-    isKeyDown('KeyW') && this.ship.translate('forward');
-    isKeyDown('KeyS') && this.ship.translate('back');
-    isKeyDown('KeyA') && this.ship.translate('left');
-    isKeyDown('KeyD') && this.ship.translate('right');
-    isKeyDown('KeyQ') && this.ship.rotate('left');
-    isKeyDown('KeyE') && this.ship.rotate('right');
-  }
-}
-
-interface GameContext {
-  eman: EntityManager;
-  vp: CanvasCameraMan;
-  shaker: ScreenShake;
-  levelMan: LevelMan;
-}
-
-class App implements Destroyable {
-  context: GameContext;
-  stop = () => {};
-  eventsOff = new AbortController();
-
-  constructor() {
-    const eman = new EntityManager();
-    this.context = {
-      eman,
-      vp: new CanvasCameraMan(useRootElement),
-      shaker: new ScreenShake(eman),
-      levelMan: new LevelMan(),
-    };
-  }
-
-  async boot() {
-    const { eman, vp, shaker, levelMan } = this.context;
-    levelMan.setLevel(new Level0(eman, this.context));
-
-    const { stop } = createGameLoop({
-      drawTime: 1000 / 60,
-      updateTime: 1000 / 60,
-      update: (dt) => {
-        eman.update(dt);
-      },
-      draw: (interp) => {
-        // override interp since update and draw time are the same
-        interp = 1;
-
-        const ctx = vp.ctx;
-        ctx.clearRect(0, 0, vp.width, vp.height);
-
-        ctx.save();
-        vp.camera.applyToContext(ctx, asPixels(vp.width), asPixels(vp.height));
-
-        shaker.specialDraw(interp, vp, 'before');
-        eman.draw(interp, vp);
-        shaker.specialDraw(interp, vp, 'after');
-        ctx.restore();
-      },
-    });
-    this.stop = stop;
-
-    if (process.env.NODE_ENV !== 'production') {
-      ScienceHalt(() => this.destroy());
-    }
-
-    addEventListener(
-      'keydown',
-      (ev) => {
-        if (ev.key === 'ArrowRight') {
-          vp.camera.move(asWorldUnits(1), asWorldUnits(0));
-        } else if (ev.key === 'ArrowLeft') {
-          vp.camera.move(asWorldUnits(-1), asWorldUnits(0));
-        } else if (ev.key === 'ArrowUp') {
-          vp.camera.rotate(asWorldUnits(0.01));
-        } else if (ev.key === 'ArrowDown') {
-          vp.camera.rotate(asWorldUnits(-0.01));
-        }
-      },
-      { signal: this.eventsOff.signal },
-    );
-  }
-
-  async destroy() {
-    this.stop();
-    this.eventsOff.abort();
-    this.context.eman.destroy();
-  }
-}
-
-let app = new App();
-app.boot();
+// TODO: remove friend topics so there is just one or two per friend

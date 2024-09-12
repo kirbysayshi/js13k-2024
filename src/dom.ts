@@ -4,22 +4,6 @@ export const qsel = document.querySelector.bind(document);
 export const qsela = document.querySelectorAll.bind(document);
 
 const ROOT_EL = qsel('#r');
-const PRIMARY_CVS = qsel('#c');
-const UI_ROOT = qsel('#u');
-
-if (!ROOT_EL || !PRIMARY_CVS) {
-  throw new Error('Could not locate DOM!');
-}
-
-export function usePrimaryCanvas() {
-  assertDefinedFatal(PRIMARY_CVS, 'PRIMARY_CVS');
-  return PRIMARY_CVS as HTMLCanvasElement;
-}
-
-export function useUIRoot() {
-  assertDefinedFatal(UI_ROOT, 'UI_ROOT');
-  return UI_ROOT as HTMLDivElement;
-}
 
 export function useRootElement() {
   assertDefinedFatal(ROOT_EL, 'ROOT_EL');
@@ -59,10 +43,10 @@ export function createTap(el: HTMLElement, cb: () => void) {
 type EventMap<T> = T extends Window
   ? WindowEventMap
   : T extends Document
-  ? DocumentEventMap
-  : T extends HTMLElement
-  ? HTMLElementEventMap
-  : { [key: string]: Event };
+    ? DocumentEventMap
+    : T extends HTMLElement
+      ? HTMLElementEventMap
+      : { [key: string]: Event };
 
 export function listen<
   T extends EventTarget,
