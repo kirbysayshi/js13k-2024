@@ -6,7 +6,7 @@ set -e
 yarn clean
 
 # Generate latest sprite data
-yarn atlas
+# yarn atlas
 
 # TODO: consider optimizing aseprite-json by shortening names.
 
@@ -37,8 +37,11 @@ mv -f dist/bundle.min.js dist/bundle.js
 NODE_SCRIPT=$(cat <<-END
   var html = fs.readFileSync("/dev/stdin","utf8");
   var js = fs.readFileSync("./dist/bundle.js", "utf8");
-  const replaced = html.replace(/<!-- REPLACER START -->[\s\S]+<!-- REPLACER END -->/gm, "<script>" + js + "</script>");
-  fs.writeFileSync("dist/index.html", replaced);
+
+  const split = html.split(/<!--REPLACER START-->[\s\S]*?<!--REPLACER END-->/g);
+  split.splice(1, 0, "<script>" + js + "</script>");
+
+  fs.writeFileSync("dist/index.html", split.join(''));
 END
 )
 <dist/index.html node -e "$NODE_SCRIPT"
