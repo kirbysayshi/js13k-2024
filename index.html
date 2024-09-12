@@ -1,0 +1,111 @@
+<!doctypehtml><meta charset="UTF-8"><title>Game Bucket</title><style>body,html{margin:0;padding:0;overflow:hidden;background-color:#c6c;position:relative;height:100%;font-family:Arial,Helvetica,sans-serif;color:#fff}.border-1{border:1px solid #fff}</style><meta name="viewport"content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0"><meta name="apple-mobile-web-app-capable"content="yes"><meta name="apple-mobile-web-app-status-bar-style"content="black-translucent"><body><script>!function(){"use strict";function h(e){return"string"==typeof e}function v(e){return"number"==typeof e}function y(e){return null!==e&&"string"!=typeof e&&"number"!=typeof e&&"function"!=typeof e&&!Array.isArray(e)&&"nodeType"in e}function g(t,...n){var r=[],o=[],a=[],l=[];for(let e=0;e<t.length;e++){var i=t[e],s=n[e],u=i.match(/ref="?$/),d=i.match(/on([a-z]+)="?/),f="xxxxxxxxxxxx".replace(/x/g,()=>Math.floor(16*Math.random()).toString(16));if(void 0===s)r.push(i);else if(null!==u&&"function"==typeof s)o.push({key:f,t:s}),r.push(i,f);else if(null!==d&&"function"==typeof s){if(!d)throw new Error("Unreachable");u=d[1];a.push({key:f,name:u,t:s}),r.push(i,f)}else if(h(s))r.push(i,s);else if(v(s))r.push(i,String(s));else if(y(s))l.push({key:f,i:s}),r.push(i,`<span data-stract=${f}></span>`);else if(Array.isArray(s)){r.push(i);for(let e=0;e<s.length;e++){var c=s[e];h(c)?r.push(c):v(c)?r.push(String(c)):y(c)&&(l.push({key:f,i:c}),r.push(`<span data-stract=${f}></span>`))}}else{if(s)throw new Error(`Type ${typeof s} is not a valid interpolation!`);r.push(i)}}var e=document.createElement("template");e.innerHTML=r.join("");let p=e["content"];return a.forEach(e=>{var t="on"+e.name,n=`[${t}='${e.key}']`,n=p.querySelector(n);n.removeAttribute(t),n.addEventListener(e.name,e.t)}),l.forEach(t=>{var n,e=`[data-stract='${t.key}']`,e=p.querySelector(e);if(Array.isArray(t.i)){var r=e;for(let e=0;e<t.i.length;e++)n=t.i[e],r.parentNode.insertBefore(n,r.nextSibling);e.parentNode.removeChild(e)}else e.parentNode.replaceChild(t.i,e)}),o.forEach(e=>{var t=`[ref='${e.key}']`,t=p.querySelector(t);t.removeAttribute("ref"),e.t(t)}),p}let u=new Set;function m(e){return u.add(e),()=>u.delete(e)}let d=new Set,c=new Set;class f{constructor(){}next=null;set(...e){this.clear(),this.next=setInterval(...e)}clear(){this.next&&clearInterval(this.next)}}function x(){let t={o:null};return[t,e=>t.o=e]}function $(){m(()=>{.5<Math.random()&&t.o?.appendChild(function(){let t=b(.85<Math.random()?4:2);let e=0,n=m(()=>{r.o&&(e+=1,r.o.style.opacity=""+(1-e/10),10<e)&&(r.o.remove(),n())}),[r,o]=x();return g`
+    <li
+      ref=${o}
+      draggable="true"
+      ondragstart=${function(e){e.dataTransfer&&(e.dataTransfer.dropEffect="move",e.dataTransfer.setData("text/plain",t),e=e.target,C.l=e)}}
+      ondrag=${function(e){e.target.style.outline="1px solid red"}}
+      ondragend=${function(e){e.target.style.outline=""}}
+    >
+      <button>✥</button>
+      ${t}
+    </li>
+  `}())});let t={o:null};return g`
+    <div>
+      <ul ref=${e=>t.o=e}>
+      </ul>
+    </div>
+  `}let o=["◯","△","◻","✕"];function b(t){let n="";for(let e=0;e<t;e++){var r=Math.random();n=(""+n+o[Math.floor(r*o.length)]).split("").sort().join("")}return n}function k(e){var t=e/1e3,n=Math.floor(t%3600/60),t=Math.floor(t%60),e=e%1e3;return`${9<n?n:"0"+n}:${9<t?t:"0"+t}.`+(99<e?e:9<e?"0"+e:"00"+e)}let C={l:null};document.querySelector("body")?.appendChild(function(){let e=new f,t=(e.set(()=>{for(var e of u)e()},1e3),new f),n=(t.set(()=>{for(var e of d)e()},100),new f);function r(){e.clear(),t.clear(),n.clear()}n.set(()=>{for(var e of c)e()},10),window.addEventListener("keyup",e=>{"Escape"===e.key&&(r(),console.log("halt"))});let o=[{id:"a",u:50},{id:"b",u:40},{id:"c",u:75}];function a(){r()}let l={o:null};function p(t){var e,n=o.findIndex(e=>e.id===t);-1!==n&&(o.splice(n,1),0===o.length)&&({ms:n,points:e}=l.o?.()??{ms:0,points:0},i.o?.appendChild(function(t,e,n){let[r,o]=x(),a="Anxiety Not Sustained".split(" "),l=[`Anxiety lasted ${k(e)}, ${n} points`],i=m(()=>{if(0===a.length){var e=l.shift();if(!e)return;if(r.o?.appendChild(g`<span style="font-size: 1rem;"><span style="background-color: black;">${e}</span></span>`),0===l.length)return i(),void t()}e=a.shift();e&&r.o?.appendChild(g`<span><span style="background-color: black;">${e}</span></span>`)});return g`
+    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0">
+      <div
+        ref=${o}
+        style="
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          font-size: 5rem;
+          text-transform: uppercase;
+        "
+      ></div>
+    </div>
+  `}(a,n,e)))}let[i,s]=x();return g`
+    <div ref=${s} style="position: relative;">
+      ${function(e,t){let[n,r]=x(),[o,a]=x(),[l,i]=x(),s=0,u=0;var d=()=>{n.o&&o.o&&f&&(s+=10,n.o.textContent=k(s),u+=e(),o.o.textContent=u+" points")};c.add(d);let f=!0;return t.o=function(){return f=!1,l.o.textContent="Anxiety Not Sustained",{ms:s,points:u}},g`
+    <div
+      style="
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      "
+    >
+      <div style="position: relative;">
+        <header
+          ref=${i}
+          style='
+            position: absolute;
+            left: 0;
+            top: 0;
+            background-color: black;
+            text-transform: uppercase;
+          '
+        >Anxiety Sustaining</header>
+        <div
+          style="
+            font-size: 5rem;
+            font-variant-numeric: tabular-nums;
+            font-family: monospace;
+            font-weight: bold;
+          "
+          ref=${r}
+        ></div>
+        <div
+          ref=${a}
+        ></div>
+      </div>
+    </div>
+  `}(function(){return o.length},l)}
+      ${o.map(s=>{{var u=s.id,d=p;s=s.u;let[e,t]=x(),[r,n]=x(),[o,a]=x();function f(){r.o&&o.o&&(100<=r.o.value?(o.o.style.backgroundColor="red",o.o.textContent="Shame Unrecoverable"):90<r.o.value?(o.o.style.backgroundColor="red",o.o.textContent="Shame Critical!!!"):r.o.value<=90&&(o.o.style.backgroundColor="black",o.o.textContent="Shame OK"))}m(()=>{r.o&&o.o&&(r.o.value+=.75<Math.random()?5:1,f(),100<=r.o.value)&&(i=!1,e.o&&(e.o.style.opacity="0.2",d(u)))});let l=[],i=(l.push(b(2)),l.push(b(4)),!0);function c(e){if(e.dataTransfer&&i){let t=e.dataTransfer.getData("text/plain");return l.find(e=>e===t)}}return g`
+    <div
+      data-friendid=${u}
+      ref=${t}
+      class="border-1"
+      ondrop=${function(e){e.preventDefault();var t,n=e.dataTransfer?.getData("text/plain");n&&(console.log("Dropped "+n),(t=C).l&&(t.l.remove(),t.l=null),e.currentTarget.style.backgroundColor="transparent",r.o&&(r.o.value-=10*n.length),f())}}
+      ondragover=${function(e){c(e)&&e.preventDefault()}}
+      ondragenter=${function(e){c(e)&&(console.log("drag enter"),e.currentTarget.style.backgroundColor="blue")}}
+      ondragleave=${function(e){console.log("drag leave"),e.currentTarget.style.backgroundColor="transparent"}}
+    >
+      <div style="pointer-events:none;">
+        <div>Friend A</div>
+        <div style="position:relative; height: 2rem;">
+          <meter
+            ref=${n}
+            value=${s}
+            min=0
+            optimium=0
+            low="10"
+            high=90
+            max=100
+            style="
+              width: 100%;
+              height: 1rem;
+            "
+          ></meter>
+          <label
+            ref=${a}
+            style="
+              position:absolute;
+              right: 0;
+              bottom: 0;
+              background-color: black;
+              text-transform: uppercase;
+            "
+          >Shame</label>
+        </div>
+        <ul>
+          ${l.map(e=>g`<li>${e}</li>`)}
+        </ul>
+      </div>
+    </div>
+  `}})}
+      ${$()}
+    </div>
+  `}())}()</script>
