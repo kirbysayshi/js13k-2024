@@ -187,7 +187,6 @@ function Friend(
       ondragleave=${onDragLeave}
     >
       <div style="pointer-events:none;">
-        <div>Friend A</div>
         <div style="position:relative; height: 2rem;">
           <meter
             ref=${setProgressRef}
